@@ -109,3 +109,6 @@ x64/
 saves/
 *.dir
 .vscode/
+Release/
+*.user
+.vs/
