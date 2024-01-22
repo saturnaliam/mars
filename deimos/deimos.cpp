@@ -74,6 +74,8 @@ void __stdcall attachedMain(HMODULE hModule) {
   consoleMode |= DISABLE_NEWLINE_AUTO_RETURN;            
   SetConsoleMode( handleOut , consoleMode );
 
+  SetConsoleTitleA("deimos");
+
   if (fstdout == nullptr) {
     panic("failed to open stdout!", hModule);
   }
@@ -90,8 +92,7 @@ void __stdcall attachedMain(HMODULE hModule) {
 
   // the main loop ft. horrible ansi stuff
   std::cout << "\x1b[38;5;252m";
-  std::cout << R"( 
-   _     _               
+  std::cout << R"(   _     _               
  _| |___|_|_____ ___ ___ 
 | . | -_| |     | . |_ -|
 |___|___|_|_|_|_|___|___|
@@ -99,10 +100,10 @@ void __stdcall attachedMain(HMODULE hModule) {
   std::cout << "\n[E]nable Hook // [D]isable Hook // [Q]uit\n";
   while (!GetAsyncKeyState('Q')) {
     if (GetAsyncKeyState('E')) {
-      std::cout << "\x1b[H\n\n\n\n\n\n\n\x1b[KHook [\x1b[38;5;78mENABLED\x1b[38;5;252m]\n";
+      std::cout << "\x1b[H\n\n\n\n\n\n\x1b[KHook [\x1b[38;5;78mENABLED\x1b[38;5;252m]\n";
       MH_EnableHook(MH_ALL_HOOKS);
     } else if (GetAsyncKeyState('D')) {
-      std::cout << "\x1b[H\n\n\n\n\n\n\n\x1b[KHook [\x1b[38;5;203mDISABLED\x1b[38;5;252m]\n";
+      std::cout << "\x1b[H\n\n\n\n\n\n\x1b[KHook [\x1b[38;5;203mDISABLED\x1b[38;5;252m]\n";
       MH_DisableHook(MH_ALL_HOOKS);
     }
   }
