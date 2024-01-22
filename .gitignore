@@ -112,3 +112,4 @@ saves/
 Release/
 *.user
 .vs/
+Minhook.h
