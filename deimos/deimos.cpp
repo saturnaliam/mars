@@ -3,17 +3,34 @@
 #include <conio.h>
 #include <string>
 #include <iostream>
+#include <fstream>
 
 // minhook setup
 #include <MinHook.h>
 #pragma comment(lib, "libMinHook.x86.lib")
+
+// enabling ANSI escape codes
+#define ENABLE_VIRTUAL_TERMINAL_PROCESSING 0x0004
+#define DISABLE_NEWLINE_AUTO_RETURN  0x0008
 
 // horrifying minhook stuff
 typedef BOOL(WINAPI* writeFile)(HANDLE hFile, LPCVOID lpBuffer, DWORD nNumberOfBytesToWrite, LPDWORD lpNumberOfBytesWritten, LPOVERLAPPED lpOverlapped);
 writeFile pWriteFile = nullptr;
 
 BOOL WINAPI detourWriteFile(HANDLE hFile, LPCVOID lpBuffer, DWORD nNumberOfBytesToWrite, LPDWORD lpNumberOfBytesWritten, LPOVERLAPPED lpOverlapped) {
-  std::cout << "file written\n";
+  static int currentFile = 0;
+
+  std::string buffer;
+  for (int i = 0; i < nNumberOfBytesToWrite; i++) {
+    buffer = ((const char*)(lpBuffer))[i]; // fucked up hack
+  }
+
+  std::cout << "\x1b[Kwriting to save" << ++currentFile << ".dat\r";
+  std::string filename = "saves\\save" + std::to_string(currentFile) + ".dat";
+  std::ofstream file(filename);
+  file << buffer;
+  file.close();
+
   return pWriteFile(hFile, lpBuffer, nNumberOfBytesToWrite, lpNumberOfBytesWritten, lpOverlapped);
 }
 
@@ -49,6 +66,14 @@ void __stdcall attachedMain(HMODULE hModule) {
   FILE* fstdout;
   freopen_s(&fstdout, "CONOUT$", "w", stdout);
 
+  // setting up ANSI escape codes
+  HANDLE handleOut = GetStdHandle(STD_OUTPUT_HANDLE);
+  DWORD consoleMode;
+  GetConsoleMode( handleOut , &consoleMode);
+  consoleMode |= ENABLE_VIRTUAL_TERMINAL_PROCESSING;
+  consoleMode |= DISABLE_NEWLINE_AUTO_RETURN;            
+  SetConsoleMode( handleOut , consoleMode );
+
   if (fstdout == nullptr) {
     panic("failed to open stdout!", hModule);
   }
@@ -62,8 +87,25 @@ void __stdcall attachedMain(HMODULE hModule) {
     panic("hook failed!", hModule, fstdout);
   }
 
-  MH_EnableHook(MH_ALL_HOOKS);
-  while (!GetAsyncKeyState('Q')) {}
+
+  // the main loop ft. horrible ansi stuff
+  std::cout << "\x1b[38;5;252m";
+  std::cout << R"( 
+   _     _               
+ _| |___|_|_____ ___ ___ 
+| . | -_| |     | . |_ -|
+|___|___|_|_|_|_|___|___|
+                         )";
+  std::cout << "\n[E]nable Hook // [D]isable Hook // [Q]uit\n";
+  while (!GetAsyncKeyState('Q')) {
+    if (GetAsyncKeyState('E')) {
+      std::cout << "\x1b[H\n\n\n\n\n\n\n\x1b[KHook [\x1b[38;5;78mENABLED\x1b[38;5;252m]\n";
+      MH_EnableHook(MH_ALL_HOOKS);
+    } else if (GetAsyncKeyState('D')) {
+      std::cout << "\x1b[H\n\n\n\n\n\n\n\x1b[KHook [\x1b[38;5;203mDISABLED\x1b[38;5;252m]\n";
+      MH_DisableHook(MH_ALL_HOOKS);
+    }
+  }
 
   shutdown(hModule, fstdout);
 }
