@@ -60,6 +60,15 @@ void __stdcall panic(std::string message, HMODULE hModule, FILE* fstdout = nullp
   exit(1);
 }
 
+/**
+ * @brief Prints whether the hook is enabled / disabled bc i dont wanna retype that horrible ANSI stuff
+ */
+inline void disabled_enabled_printing(const std::string &message, const int &color) {
+  const std::string reset_lines = "\x1b[H\n\n\n\n\n\n\x1b[K";
+  const std::string text_color = "\x1b[38;5;" + std::to_string(color) + "m";
+  std::cout << reset_lines << "Hook [" << text_color << message << "\x1b[38;5;252m]\n";
+}
+
 void __stdcall attachedMain(HMODULE hModule) {
   // setting up the console
   AllocConsole();
@@ -89,8 +98,9 @@ void __stdcall attachedMain(HMODULE hModule) {
     panic("hook failed!", hModule, fstdout);
   }
 
-
   // the main loop ft. horrible ansi stuff
+  bool enabled = false;  
+
   std::cout << "\x1b[38;5;252m";
   std::cout << R"(   _     _               
  _| |___|_|_____ ___ ___ 
@@ -99,11 +109,13 @@ void __stdcall attachedMain(HMODULE hModule) {
                          )";
   std::cout << "\n[E]nable Hook // [D]isable Hook // [Q]uit\n";
   while (!GetAsyncKeyState('Q')) {
-    if (GetAsyncKeyState('E')) {
-      std::cout << "\x1b[H\n\n\n\n\n\n\x1b[KHook [\x1b[38;5;78mENABLED\x1b[38;5;252m]\n";
+    if (GetAsyncKeyState('E') && !enabled) {
+      enabled = true;
+      disabled_enabled_printing("ENABLED", 78);
       MH_EnableHook(MH_ALL_HOOKS);
-    } else if (GetAsyncKeyState('D')) {
-      std::cout << "\x1b[H\n\n\n\n\n\n\x1b[KHook [\x1b[38;5;203mDISABLED\x1b[38;5;252m]\n";
+    } else if (GetAsyncKeyState('D') && enabled) {
+      enabled = false;
+      disabled_enabled_printing("DISABLED", 203);
       MH_DisableHook(MH_ALL_HOOKS);
     }
   }
