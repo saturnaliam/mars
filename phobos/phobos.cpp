@@ -2,15 +2,17 @@
 #include <windows.h>
 #include <conio.h>
 #include <string>
+#include <cstdio>
 #include <iostream>
 #include <cstdint>
 #include <vector>
+#include <optional>
 
 // enabling ANSI escape codes
 #define ENABLE_VIRTUAL_TERMINAL_PROCESSING 0x0004
 #define DISABLE_NEWLINE_AUTO_RETURN  0x0008
 
-typedef std::int32_t s32;
+typedef std::int32_t s32; 
 
 struct GameValues {
   volatile s32* coins;
@@ -25,8 +27,9 @@ struct GameValues {
  * @param fstdout The stdout handle.
  * @param exitCode Exit code, default 0.
  */
-void __stdcall shutdown(HMODULE hModule, FILE* fstdout, DWORD exitCode = 0) {
+void __stdcall shutdown(HMODULE hModule, FILE* fstdout, FILE* fstdin, DWORD exitCode = 0) {
   if (fstdout != nullptr) fclose(fstdout);
+  if (fstdin != nullptr) fclose(fstdin);
   FreeConsole();
   FreeLibraryAndExitThread(hModule, exitCode);
 }
@@ -37,9 +40,9 @@ void __stdcall shutdown(HMODULE hModule, FILE* fstdout, DWORD exitCode = 0) {
  * @param hModule HMODULE of the thread.
  * @param fstdout The stdout handle, default nullptr.
  */
-void __stdcall panic(std::string message, HMODULE hModule, FILE* fstdout = nullptr) {
+void __stdcall panic(std::string message, HMODULE hModule, FILE* fstdout = nullptr, FILE* fstdin = nullptr) {
   MessageBoxA(0, message.c_str(), "phobos panicked!", MB_OK | MB_ICONERROR);
-  shutdown(hModule, fstdout, 1);
+  shutdown(hModule, fstdout, fstdin, 1);
 
   exit(1);
 }
@@ -70,11 +73,29 @@ GameValues getGameValues() {
   return { .coins = coins, .chocolate = chocolate, .fertilizer = fertilizer, .bugSpray = bugSpray };
 }
 
+std::optional<s32> userInputToInt() {
+  std::string input;
+  std::cin.clear();
+  std::cin >> input; 
+  
+  if (input == "") return {};
+
+  for (char c : input) {
+    if (!isdigit(c)) {
+      return {};
+    }
+  }
+
+  return atoi(input.c_str());
+}
+
 void __stdcall attachedMain(HMODULE hModule) {
   // setting up the console
   AllocConsole();
   FILE* fstdout;
+  FILE* fstdin;
   freopen_s(&fstdout, "CONOUT$", "w", stdout);
+  freopen_s(&fstdin, "CONIN$", "r", stdin);
 
   // setting up ANSI escape codes
   HANDLE handleOut = GetStdHandle(STD_OUTPUT_HANDLE);
@@ -84,23 +105,65 @@ void __stdcall attachedMain(HMODULE hModule) {
   consoleMode |= DISABLE_NEWLINE_AUTO_RETURN;            
   SetConsoleMode( handleOut , consoleMode );
 
+  CONSOLE_CURSOR_INFO cursorInfo;
+  GetConsoleCursorInfo(handleOut, &cursorInfo);
+  cursorInfo.bVisible = false;
+  SetConsoleCursorInfo(handleOut, &cursorInfo);
+
   SetConsoleTitleA("phobos");
 
-  if (fstdout == nullptr) {
+  if (fstdout == nullptr || fstdin == nullptr) {
     panic("failed to open stdout!", hModule);
   }
 
   // the main loop ft. horrible ansi stuff
   bool enabled = false;  
 
+  std::cout << R"(     _       _           
+ ___| |_ ___| |_ ___ ___ 
+| . |   | . | . | . |_ -|
+|  _|_|_|___|___|___|___|
+|_| by saturnalia )";
+
   std::cout << "\x1b[38;5;252m";
+  std::cout << "\n\nEdit Coins [C] // Edit Fertilizer [F] // Edit Bug Spray [B] // Edit Chocolate [H] // Quit [Q]\n\n";
 
   GameValues values = getGameValues();
   while (!GetAsyncKeyState('Q')) {
-    std::cout << *values.coins << "    \r";
+    std::cout << "\x1b[H\n\n\n\n\n\n\n\n";
+    printf("\x1b[2KCoins: %d @ %X (in game as %d)\n", *values.coins, values.coins, *values.coins*10);
+    printf("Fertilizer: %d @ %X (in game as %d)   \n", *values.fertilizer, values.fertilizer, *values.fertilizer-1000);
+    printf("Bug Spray: %d @ %X (in game as %d)   \n", *values.bugSpray, values.bugSpray, *values.bugSpray-1000);
+    printf("Chocolate: %d @ %X (in game as %d)   \n", *values.chocolate, values.chocolate, *values.chocolate-1000);
+
+    if (GetAsyncKeyState('C')) {
+      std::cout << "Editing coins: ";
+      std::cin.clear();
+      std::optional<int> input = userInputToInt();
+      *values.coins = input.value_or(*values.coins);
+      std::cout << "\x1b[A\x1b[2K";
+    } else if (GetAsyncKeyState('F')) {
+      std::cout << "Editing fertilizer: ";
+      std::cin.clear();
+      std::optional<int> input = userInputToInt();
+      *values.fertilizer = input.value_or(*values.fertilizer);
+      std::cout << "\x1b[A\x1b[2K";
+    } else if (GetAsyncKeyState('B')) {
+      std::cout << "Editing bug spray: ";
+      std::cin.clear();
+      std::optional<int> input = userInputToInt();
+      *values.bugSpray = input.value_or(*values.bugSpray);
+      std::cout << "\x1b[A\x1b[2K";
+    } else if (GetAsyncKeyState('H')) {
+      std::cout << "Editing chocolate: ";
+      std::cin.clear();
+      std::optional<int> input = userInputToInt();
+      *values.chocolate = input.value_or(*values.chocolate);
+      std::cout << "\x1b[A\x1b[2K";
+    }
   }
 
-  shutdown(hModule, fstdout);
+  shutdown(hModule, fstdout, fstdin);
 }
 
 int __stdcall DllMain(HMODULE hModule, DWORD dwReason, LPVOID lpReserved) {
